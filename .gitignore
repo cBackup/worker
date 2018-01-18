@@ -1,0 +1,9 @@
+# IDEs
+.idea
+
+# compile folders
+out
+target
+
+# sshd
+hostKey.ser

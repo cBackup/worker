@@ -1,0 +1,10 @@
+*.java text eol=lf
+*.iml  text eol=lf
+*.xml  text eol=lf
+*.md   text eol=lf
+*.mf   text eol=lf
+*.MF   text eol=lf
+
+.gitignote     text eol=lf
+.properties    text eol=lf
+.gitattributes text eol=lf
