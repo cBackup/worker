@@ -531,7 +531,7 @@ public class GeneralSsh extends AbstractProtocol {
 
             this.sshEscapedRealPrompt = this.expect.getLastState().getBuffer().replace(this.currentCommand, "");
             // replacing ANSI control chars
-            this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replaceAll("\u001B\\[[\\d;]*[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
+            this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
 
             this.sshRealPrompt = this.sshEscapedRealPrompt.trim();
             this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replace("[", "\\[").trim();
@@ -721,7 +721,7 @@ public class GeneralSsh extends AbstractProtocol {
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer().replace(this.currentCommand, "")
                         // replacing ANSI control chars
-                        .replaceAll("\u001B\\[[\\d;]*[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]", "")
+                        .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
                         .replace(this.sshRealPrompt, "")
                         .trim();
                 }

@@ -461,7 +461,7 @@ public class GeneralTelnet extends AbstractProtocol {
 
             this.telnetEscapedRealPrompt = this.expect.getLastState().getBuffer().replace(this.currentCommand, "");
             // replacing ANSI control chars
-            this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replaceAll("\u001B\\[[\\d;]*[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
+            this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
 
             this.telnetRealPrompt        = this.telnetEscapedRealPrompt.trim();
             this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replace("[", "\\[").trim();
@@ -596,7 +596,7 @@ public class GeneralTelnet extends AbstractProtocol {
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer().replace(this.currentCommand, "")
                         // replacing ANSI control chars
-                        .replaceAll("\u001B\\[[\\d;]*[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]", "")
+                        .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
                         .replace(this.telnetRealPrompt, "")
                         .trim();
                 }
