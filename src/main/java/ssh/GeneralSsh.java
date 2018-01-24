@@ -42,7 +42,6 @@ public class GeneralSsh extends AbstractProtocol {
     protected String ENTER_CHARACTER                            = "\n";
 
     protected String sshPromptChar;
-    protected String sshRealPrompt;
     protected String sshEscapedRealPrompt;
     protected String currentCommand;
 
@@ -421,7 +420,13 @@ public class GeneralSsh extends AbstractProtocol {
                 currentTimeoutInt = this.sshTimeout;
             }
 
-            DTOSendExpectPair currentPair = new DTOSendExpectPair(this.sshEscapedRealPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable);
+            /*
+             * Set prompt to expect(custom or not)
+             */
+            String customPrompt  = jobInfo.get("cli_custom_prompt");
+            String currentPrompt = (customPrompt == null || customPrompt.length()==0)? this.sshEscapedRealPrompt : customPrompt;
+
+            DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable);
             this.sshCommands.add(currentPair);
 
         }
@@ -532,10 +537,7 @@ public class GeneralSsh extends AbstractProtocol {
             this.sshEscapedRealPrompt = this.expect.getLastState().getBuffer().replace(this.currentCommand, "");
             // replacing ANSI control chars
             this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
-
-            this.sshRealPrompt = this.sshEscapedRealPrompt.trim();
             this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replace("[", "\\[").trim();
-
         }
 
         if(this.sshEscapedRealPrompt.length() == 0) {
@@ -719,10 +721,11 @@ public class GeneralSsh extends AbstractProtocol {
 
                 String valueToSave;
                 if(!skipCommand) {
-                    valueToSave = this.expect.getLastState().getBuffer().replace(this.currentCommand, "")
+                    valueToSave = this.expect.getLastState().getBuffer()
+                        .replace(this.currentCommand.trim(), "")
+                        .replace(currentPair.getExpect(), "")
                         // replacing ANSI control chars
                         .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
-                        .replace(this.sshRealPrompt, "")
                         .trim();
                 }
                 else {

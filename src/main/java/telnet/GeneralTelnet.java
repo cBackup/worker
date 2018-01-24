@@ -43,7 +43,6 @@ public class GeneralTelnet extends AbstractProtocol {
     protected static String ENTER_CHARACTER                     = "\r\n";
 
     protected String telnetPromptChar;
-    protected String telnetRealPrompt;
     protected String telnetEscapedRealPrompt;
     protected String currentCommand;
 
@@ -416,7 +415,13 @@ public class GeneralTelnet extends AbstractProtocol {
                 currentTimeoutInt = this.telnetTimeout;
             }
 
-            DTOSendExpectPair currentPair = new DTOSendExpectPair(this.telnetEscapedRealPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable);
+            /*
+             * Set prompt to expect(custom or not)
+             */
+            String customPrompt  = jobInfo.get("cli_custom_prompt");
+            String currentPrompt = (customPrompt == null || customPrompt.length()==0)? this.telnetEscapedRealPrompt : customPrompt;
+
+            DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable);
             this.telnetCommands.add(currentPair);
 
         }
@@ -462,10 +467,7 @@ public class GeneralTelnet extends AbstractProtocol {
             this.telnetEscapedRealPrompt = this.expect.getLastState().getBuffer().replace(this.currentCommand, "");
             // replacing ANSI control chars
             this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
-
-            this.telnetRealPrompt        = this.telnetEscapedRealPrompt.trim();
             this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replace("[", "\\[").trim();
-
         }
 
         if(this.telnetEscapedRealPrompt.length() == 0) {
@@ -594,10 +596,11 @@ public class GeneralTelnet extends AbstractProtocol {
                 String valueToSave;
 
                 if(!skipCommand) {
-                    valueToSave = this.expect.getLastState().getBuffer().replace(this.currentCommand, "")
+                    valueToSave = this.expect.getLastState().getBuffer()
+                        .replace(this.currentCommand.trim(), "")
+                        .replace(currentPair.getExpect(), "")
                         // replacing ANSI control chars
                         .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
-                        .replace(this.telnetRealPrompt, "")
                         .trim();
                 }
                 else {
