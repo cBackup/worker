@@ -723,7 +723,7 @@ public class GeneralSsh extends AbstractProtocol {
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer()
                         .replace(this.currentCommand.trim(), "")
-                        .replace(currentPair.getExpect(), "")
+                        .replaceAll(currentPair.getExpect(), "")
                         // replacing ANSI control chars
                         .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
                         .trim();
