@@ -43,6 +43,11 @@ public class _Mikrotik_Telnet extends GeneralTelnet {
          * Parent constructor
          */
         super(coordinates, settings, credentials, jobs, variables);
+
+        /*
+         * Set ENTER_CHARACTER
+         */
+        ENTER_CHARACTER = "\r\n";
     }
 
     /**

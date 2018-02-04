@@ -25,6 +25,7 @@ import abstractions.AbstractProtocol;
 
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /*
  * Expect4j
@@ -40,7 +41,7 @@ import expect4j.ExpectUtils;
 public class GeneralTelnet extends AbstractProtocol {
 
     protected static final int COMMAND_EXECUTION_SUCCESS_OPCODE = -2;
-    protected static String ENTER_CHARACTER                     = "\r\n";
+    protected static String ENTER_CHARACTER                     = "\n";
 
     protected String telnetPromptChar;
     protected String telnetEscapedRealPrompt;
@@ -463,11 +464,10 @@ public class GeneralTelnet extends AbstractProtocol {
             return false;
         }
         else {
-
-            this.telnetEscapedRealPrompt = this.expect.getLastState().getBuffer().replace(this.currentCommand, "");
-            // replacing ANSI control chars
-            this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
-            this.telnetEscapedRealPrompt = this.telnetEscapedRealPrompt.replace("[", "\\[").trim();
+            this.telnetEscapedRealPrompt = this.expect.getLastState().getBuffer()
+                    .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
+                    .replace("[", "\\[") // Escape for expect4j
+                    .trim();
         }
 
         if(this.telnetEscapedRealPrompt.length() == 0) {
@@ -597,11 +597,12 @@ public class GeneralTelnet extends AbstractProtocol {
 
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer()
-                        .replace(this.currentCommand.trim(), "")
-                        .replaceAll(currentPair.getExpect(), "")
-                        // replacing ANSI control chars
-                        .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
-                        .trim();
+                            .replace(this.currentCommand.trim(), "")
+                            .replaceAll(Pattern.quote(currentPair.getExpect().replace("\\[", "[")), "")
+                            .trim()
+                            // replacing ANSI control chars
+                            .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
+                            .trim();
                 }
                 else {
                     valueToSave = "";

@@ -31,6 +31,7 @@ import expect4j.Expect4j;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 
 /**
@@ -533,11 +534,10 @@ public class GeneralSsh extends AbstractProtocol {
             return false;
         }
         else {
-
-            this.sshEscapedRealPrompt = this.expect.getLastState().getBuffer().replace(this.currentCommand, "");
-            // replacing ANSI control chars
-            this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","");
-            this.sshEscapedRealPrompt = this.sshEscapedRealPrompt.replace("[", "\\[").trim();
+            this.sshEscapedRealPrompt = this.expect.getLastState().getBuffer()
+                    .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
+                    .replace("[", "\\[") // Escape for expect4j
+                    .trim();
         }
 
         if(this.sshEscapedRealPrompt.length() == 0) {
@@ -723,7 +723,8 @@ public class GeneralSsh extends AbstractProtocol {
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer()
                         .replace(this.currentCommand.trim(), "")
-                        .replaceAll(currentPair.getExpect(), "")
+                        .replaceAll(Pattern.quote(currentPair.getExpect().replace("\\[", "[")), "")
+                        .trim()
                         // replacing ANSI control chars
                         .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
                         .trim();
