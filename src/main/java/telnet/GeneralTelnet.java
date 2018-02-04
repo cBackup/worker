@@ -420,9 +420,17 @@ public class GeneralTelnet extends AbstractProtocol {
              * Set prompt to expect(custom or not)
              */
             String customPrompt  = jobInfo.get("cli_custom_prompt");
-            String currentPrompt = (customPrompt == null || customPrompt.length()==0)? this.telnetEscapedRealPrompt : customPrompt;
+            String currentPrompt;
+            Boolean replaceExpect = true;
+            if (customPrompt == null || customPrompt.length()==0) {
+                currentPrompt = this.telnetEscapedRealPrompt;
+            }
+            else {
+                currentPrompt = customPrompt;
+                replaceExpect = false;
+            };
 
-            DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable);
+            DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable, replaceExpect);
             this.telnetCommands.add(currentPair);
 
         }
@@ -449,7 +457,7 @@ public class GeneralTelnet extends AbstractProtocol {
         /*
          * Send enter
          */
-        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.telnetPromptChar, "", "", this.telnetTimeout, null);
+        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.telnetPromptChar, "", "", this.telnetTimeout, null, false);
         if (!this.executeCommand(pairForPrompt, false)) {
             return false;
         }
@@ -598,11 +606,14 @@ public class GeneralTelnet extends AbstractProtocol {
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer()
                             .replace(this.currentCommand.trim(), "")
-                            .replaceAll(Pattern.quote(currentPair.getExpect().replace("\\[", "[")), "")
                             .trim()
                             // replacing ANSI control chars
                             .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
                             .trim();
+
+                    if(currentPair.getReplaceExpect()) {
+                        valueToSave = valueToSave.replaceAll(Pattern.quote(currentPair.getExpect().replace("\\[", "[")), "").trim();
+                    }
                 }
                 else {
                     valueToSave = "";

@@ -425,9 +425,17 @@ public class GeneralSsh extends AbstractProtocol {
              * Set prompt to expect(custom or not)
              */
             String customPrompt  = jobInfo.get("cli_custom_prompt");
-            String currentPrompt = (customPrompt == null || customPrompt.length()==0)? this.sshEscapedRealPrompt : customPrompt;
+            String currentPrompt;
+            Boolean replaceExpect = true;
+            if (customPrompt == null || customPrompt.length()==0) {
+                currentPrompt = this.sshEscapedRealPrompt;
+            }
+            else {
+                currentPrompt = customPrompt;
+                replaceExpect = false;
+            };
 
-            DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable);
+            DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable, replaceExpect);
             this.sshCommands.add(currentPair);
 
         }
@@ -519,7 +527,7 @@ public class GeneralSsh extends AbstractProtocol {
         /*
          * Send enter
          */
-        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.sshPromptChar, "", "", this.sshTimeout, null);
+        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.sshPromptChar, "", "", this.sshTimeout, null, false);
         if (!this.executeCommand(pairForPrompt, false)) {
             return false;
         }
@@ -723,11 +731,14 @@ public class GeneralSsh extends AbstractProtocol {
                 if(!skipCommand) {
                     valueToSave = this.expect.getLastState().getBuffer()
                         .replace(this.currentCommand.trim(), "")
-                        .replaceAll(Pattern.quote(currentPair.getExpect().replace("\\[", "[")), "")
                         .trim()
                         // replacing ANSI control chars
                         .replaceAll("\u001B\\[\\?[\\d;]*[^\\d;]|\u001B\\[[\\d;]*[^\\d;]|\u001B[^\\d;]|\u001B[\\d;]|\u001B\\[[^\\d;]","")
                         .trim();
+
+                    if(currentPair.getReplaceExpect()) {
+                        valueToSave = valueToSave.replaceAll(Pattern.quote(currentPair.getExpect().replace("\\[", "[")), "").trim();
+                    }
                 }
                 else {
                     valueToSave = "";
