@@ -28,6 +28,7 @@ public class DTOSendExpectPair {
     private final String tableField;
     private final Integer timeout;
     private final String variable;
+    private final Boolean replaceExpect;
 
     /**
      * Constructor
@@ -37,13 +38,15 @@ public class DTOSendExpectPair {
      * @param tableField    String  - database table field
      * @param timeout       Integer - request timeout
      * @param variable      String  - variable for response saving
+     * @param replaceExpect Boolean - replace real prompt from output?
      */
-    public DTOSendExpectPair(String expect, String send, String tableField, Integer timeout, String variable) {
+    public DTOSendExpectPair(String expect, String send, String tableField, Integer timeout, String variable, Boolean replaceExpect) {
         this.expect     = expect;
         this.send       = send;
         this.tableField = tableField;
         this.timeout    = timeout;
         this.variable   = variable;
+        this.replaceExpect = replaceExpect;
     }
 
     public void setSend(String send) { this.send = send; }
@@ -61,4 +64,6 @@ public class DTOSendExpectPair {
     public Integer getTimeout() { return this.timeout; }
 
     public String getVariable() { return this.variable; }
+
+    public Boolean getReplaceExpect() { return this.replaceExpect; }
 }

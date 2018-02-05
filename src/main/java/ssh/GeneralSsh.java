@@ -433,7 +433,7 @@ public class GeneralSsh extends AbstractProtocol {
             else {
                 currentPrompt = customPrompt;
                 replaceExpect = false;
-            };
+            }
 
             DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable, replaceExpect);
             this.sshCommands.add(currentPair);

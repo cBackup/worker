@@ -428,7 +428,7 @@ public class GeneralTelnet extends AbstractProtocol {
             else {
                 currentPrompt = customPrompt;
                 replaceExpect = false;
-            };
+            }
 
             DTOSendExpectPair currentPair = new DTOSendExpectPair(currentPrompt, currentCommand, currentTableField, currentTimeoutInt, currentVariable, replaceExpect);
             this.telnetCommands.add(currentPair);
