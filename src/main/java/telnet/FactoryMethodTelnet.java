@@ -46,6 +46,7 @@ public class FactoryMethodTelnet {
 
     private static final Map<String, Map<String, String>> models = new HashMap<String, Map<String, String>>() {{
         put("Mikrotik", null);
+        put("Nortel", null);
         //put("Extream", null); todo implement
     }};
 
