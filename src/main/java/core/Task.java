@@ -647,10 +647,6 @@ public class Task extends AbstractCoreUnit implements Runnable
              */
             this.logBadResponse("ERROR", "TASK EXECUTE", "Task " + this.coordinates.get("taskName") + " can't run yii command task. API response error.", runYiiCommandResponse);
         }
-        else {
-            this.logMessage("INFO", "TASK EXECUTE", "Task " + this.coordinates.get("taskName") + ". Yii console command successfully started.");
-        }
-
     }
 
 }

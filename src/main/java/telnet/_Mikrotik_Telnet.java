@@ -47,7 +47,8 @@ public class _Mikrotik_Telnet extends GeneralTelnet {
         /*
          * Set ENTER_CHARACTER
          */
-        ENTER_CHARACTER = "\r\n";
+        this.ENTER_CHARACTER = "\r\n";
+        this.controlSeqences.put("%%SEQ(ENTER)%%", this.ENTER_CHARACTER);
     }
 
     /**

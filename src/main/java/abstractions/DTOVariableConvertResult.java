@@ -41,7 +41,7 @@ public class DTOVariableConvertResult {
     private String action;
 
     /**
-     * Status of variable canvertation success | exception
+     * Status of variable conversion success | exception
      */
     private String status;
 

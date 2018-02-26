@@ -21,6 +21,7 @@ import abstractions.DTOExpectSendPair;
 import abstractions.DTOSendExpectPair;
 import abstractions.DTOProtocolResult;
 import abstractions.DTOVariableConvertResult;
+import abstractions.DTOVariableInjectResult;
 import abstractions.AbstractProtocol;
 
 import java.util.ArrayList;
@@ -40,8 +41,8 @@ import expect4j.ExpectUtils;
  */
 public class GeneralTelnet extends AbstractProtocol {
 
-    protected static final int COMMAND_EXECUTION_SUCCESS_OPCODE = -2;
-    protected static String ENTER_CHARACTER                     = "\n";
+    protected static final int COMMAND_EXECUTION_TIMEOUT_OPCODE = -2;
+    protected String ENTER_CHARACTER                            = "\n";
 
     protected String telnetPromptChar;
     protected String telnetEscapedRealPrompt;
@@ -79,6 +80,7 @@ public class GeneralTelnet extends AbstractProtocol {
         this.credentials.putAll(credentials);
         this.jobs.putAll(jobs);
         this.variables.putAll(variables);
+        this.controlSeqences.put("%%SEQ(ENTER)%%", this.ENTER_CHARACTER);
     }
 
 
@@ -111,6 +113,7 @@ public class GeneralTelnet extends AbstractProtocol {
 
 
     /**
+     * @noinspection Duplicates
      * {@inheritDoc}
      */
     @Override
@@ -119,7 +122,7 @@ public class GeneralTelnet extends AbstractProtocol {
         /*
          * Put some dynamic variables to map(nodeId, taskName)
          */
-        if(coordinates.get("nodeId") != null && coordinates.get("nodeId").length() > 0) {
+        if(this.coordinates.get("nodeId") != null && coordinates.get("nodeId").length() > 0) {
             DTOVariableConvertResult nodeIdVariableObject = new DTOVariableConvertResult();
             nodeIdVariableObject.setAction("process");
             nodeIdVariableObject.setStatus("success");
@@ -128,7 +131,7 @@ public class GeneralTelnet extends AbstractProtocol {
             nodeIdVariableObject.setResult(coordinates.get("nodeId"));
             this.variables.put("%%NODE_ID%%", nodeIdVariableObject);
         }
-        if(coordinates.get("taskName") != null && coordinates.get("taskName").length() > 0) {
+        if(this.coordinates.get("taskName") != null && coordinates.get("taskName").length() > 0) {
             DTOVariableConvertResult taskNameVariableObject = new DTOVariableConvertResult();
             taskNameVariableObject.setAction("process");
             taskNameVariableObject.setStatus("success");
@@ -136,6 +139,15 @@ public class GeneralTelnet extends AbstractProtocol {
             taskNameVariableObject.setVariableValue(coordinates.get("taskName"));
             taskNameVariableObject.setResult(coordinates.get("taskName"));
             this.variables.put("%%TASK%%", taskNameVariableObject);
+        }
+        if(this.coordinates.get("nodeIp") != null && this.coordinates.get("nodeIp").length() > 0) {
+            DTOVariableConvertResult nodeIpVariableObject = new DTOVariableConvertResult();
+            nodeIpVariableObject.setAction("process");
+            nodeIpVariableObject.setStatus("success");
+            nodeIpVariableObject.setVariableName("%%NODE_IP%%");
+            nodeIpVariableObject.setVariableValue(this.coordinates.get("nodeIp"));
+            nodeIpVariableObject.setResult(this.coordinates.get("nodeIp"));
+            this.variables.put("%%NODE_IP%%", nodeIpVariableObject);
         }
 
         String timeout         = this.settings.get("telnetTimeout");
@@ -305,18 +317,37 @@ public class GeneralTelnet extends AbstractProtocol {
                     currentResponse = null;
                 }
                 else {
-                    currentResponse = splitAuthSequence[i].trim();
+
+                    /*
+                     * Injecting variables to auth response
+                     */
+                    DTOVariableInjectResult varInjectResponse = this.injectVariable(splitAuthSequence[i].trim());
+                    if(varInjectResponse.getStatus() == 0) {
+                        if (varInjectResponse.isCtrlSeqInjected()) {
+                            currentResponse = varInjectResponse.getResult();
+                        }
+                        else {
+                            currentResponse = varInjectResponse.getResult() + ENTER_CHARACTER;
+                        }
+                    }
+                    else {
+                        String telnetAuthSequenceMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
+                                ": auth response variable inject error.";
+                        this.logMessage("ERROR", "NODE PARSE CREDENTIALS", telnetAuthSequenceMessage);
+                        return false;
+                    }
+
                     // if template variable
                     if(currentResponse.contains("{{") && currentResponse.contains("}}")) {
-                        switch(currentResponse) {
+                        switch(currentResponse.trim()) {
                             case "{{telnet_login}}":
-                                currentResponse = this.telnetLogin;
+                                currentResponse = this.telnetLogin + ENTER_CHARACTER;
                                 break;
                             case "{{telnet_password}}":
-                                currentResponse = this.telnetPassword;
+                                currentResponse = this.telnetPassword + ENTER_CHARACTER;
                                 break;
                             case "{{enable_password}}":
-                                currentResponse = this.telnetEnablePassword;
+                                currentResponse = this.telnetEnablePassword + ENTER_CHARACTER;
                                 break;
                             default:
                                 String telnetAuthSequenceMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
@@ -343,6 +374,7 @@ public class GeneralTelnet extends AbstractProtocol {
      * Send commands
      *
      * @return Boolean
+     * @noinspection Duplicates
      */
     @Override
     protected Boolean performJobs()
@@ -457,7 +489,7 @@ public class GeneralTelnet extends AbstractProtocol {
         /*
          * Send enter
          */
-        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.telnetPromptChar, "", "", this.telnetTimeout, null, false);
+        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.telnetPromptChar, ENTER_CHARACTER, "", this.telnetTimeout, null, false);
         if (!this.executeCommand(pairForPrompt, false)) {
             return false;
         }
@@ -519,47 +551,21 @@ public class GeneralTelnet extends AbstractProtocol {
             /*
              * Injecting variables to commands
              */
-            if(currentPair.getSend().contains("%%")) {
-
-                // Searching variable in command
-                for(Map.Entry<String, DTOVariableConvertResult> entry : this.variables.entrySet()) {
-                    if( currentPair.getSend().contains(entry.getKey())) {
-                        // Variable found
-                        // If variable is converted, sending command with injected variable
-                        if(entry.getValue().getAction().equals("process")) {
-                            // check if empty
-                            if(entry.getValue() != null && entry.getValue().getResult() != null && entry.getValue().getResult().length() > 0) {
-                                String tempCommand = currentPair.getSend().replaceAll(entry.getKey(), entry.getValue().getResult());
-                                currentPair.setSend(tempCommand);
-                            }
-                            else {
-                                String telnetSetVarFailedMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                        ": empty variable value returned. Command: " + currentPair.getSend() + ". Variable:" + entry.getValue().getVariableName() + ". Telnet request: set custom variable failed. Check your command.";
-                                this.logMessage("ERROR", "NODE REQUEST", telnetSetVarFailedMessage);
-                                return false;
-                            }
-                        }
-                        else {
-                            switch (entry.getValue().getStatus()) {
-                                // If variable converted with error, sending exception log
-                                case "exception":
-                                    String variableConvertMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                            ": variable convertion error. Variable: " + entry.getValue().getVariableName() + ". Message: " + entry.getValue().getMessage();
-                                    this.logMessage("ERROR", "NODE REQUEST", variableConvertMessage);
-                                    return false;
-                                // If variable converted successfully, but action is restrict, skip command and use empty string as command result
-                                case "success":
-                                    skipCommand = true;
-                                    break;
-                                default:
-                                    String variableConvertUnknownStatus = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                            ": unknown status of variable convertion. Variable: " + entry.getValue().getVariableName() + ". Status: " + entry.getValue().getStatus();
-                                    this.logMessage("ERROR", "NODE REQUEST", variableConvertUnknownStatus);
-                                    return false;
-                            }
-                        }
+            DTOVariableInjectResult varInjectResult = this.injectVariable(currentPair.getSend());
+            switch(varInjectResult.getStatus()) {
+                case 0:
+                    if (varInjectResult.isCtrlSeqInjected()) {
+                        currentPair.setSend(varInjectResult.getResult());
                     }
-                }
+                    else {
+                        currentPair.setSend(varInjectResult.getResult() + ENTER_CHARACTER);
+                    }
+                    break;
+                case 1:
+                    skipCommand = true;
+                    break;
+                case 2:
+                    return false;
             }
 
             if(!skipCommand) {
@@ -684,7 +690,7 @@ public class GeneralTelnet extends AbstractProtocol {
             /*
              * Sending command
              */
-            this.currentCommand = pair.getSend() + ENTER_CHARACTER;
+            this.currentCommand = pair.getSend();
 
             this.expect.send(this.currentCommand);
 
@@ -742,7 +748,7 @@ public class GeneralTelnet extends AbstractProtocol {
                 }
 
                 if(pair.getSend() != null) {
-                    this.expect.send(pair.getSend() + ENTER_CHARACTER);
+                    this.expect.send(pair.getSend());
                 }
 
                 return true;
@@ -769,7 +775,7 @@ public class GeneralTelnet extends AbstractProtocol {
      * @return boolean
      */
     protected boolean checkResult(int intRetVal) {
-        return intRetVal == COMMAND_EXECUTION_SUCCESS_OPCODE;
+        return intRetVal == COMMAND_EXECUTION_TIMEOUT_OPCODE;
     }
 
 

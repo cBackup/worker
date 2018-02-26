@@ -22,6 +22,7 @@ import abstractions.DTOExpectSendPair;
 import abstractions.DTOSendExpectPair;
 import abstractions.DTOProtocolResult;
 import abstractions.DTOVariableConvertResult;
+import abstractions.DTOVariableInjectResult;
 
 import com.jcraft.jsch.ChannelShell;
 import com.jcraft.jsch.JSch;
@@ -39,7 +40,7 @@ import java.util.regex.Pattern;
  * @noinspection WeakerAccess
  */
 public class GeneralSsh extends AbstractProtocol {
-    protected static final int COMMAND_EXECUTION_SUCCESS_OPCODE = -2;
+    protected static final int COMMAND_EXECUTION_TIMEOUT_OPCODE = -2;
     protected String ENTER_CHARACTER                            = "\n";
 
     protected String sshPromptChar;
@@ -82,6 +83,7 @@ public class GeneralSsh extends AbstractProtocol {
         this.credentials.putAll(credentials);
         this.jobs.putAll(jobs);
         this.variables.putAll(variables);
+        this.controlSeqences.put("%%SEQ(ENTER)%%", this.ENTER_CHARACTER);
     }
 
 
@@ -122,7 +124,7 @@ public class GeneralSsh extends AbstractProtocol {
         /*
          * Put some dynamic variables to map(nodeId, taskName)
          */
-        if(coordinates.get("nodeId") != null && coordinates.get("nodeId").length() > 0) {
+        if(this.coordinates.get("nodeId") != null && coordinates.get("nodeId").length() > 0) {
             DTOVariableConvertResult nodeIdVariableObject = new DTOVariableConvertResult();
             nodeIdVariableObject.setStatus("success");
             nodeIdVariableObject.setAction("process");
@@ -131,7 +133,7 @@ public class GeneralSsh extends AbstractProtocol {
             nodeIdVariableObject.setResult(coordinates.get("nodeId"));
             this.variables.put("%%NODE_ID%%", nodeIdVariableObject);
         }
-        if(coordinates.get("taskName") != null && coordinates.get("taskName").length() > 0) {
+        if(this.coordinates.get("taskName") != null && coordinates.get("taskName").length() > 0) {
             DTOVariableConvertResult taskNameVariableObject = new DTOVariableConvertResult();
             taskNameVariableObject.setStatus("success");
             taskNameVariableObject.setAction("process");
@@ -139,6 +141,15 @@ public class GeneralSsh extends AbstractProtocol {
             taskNameVariableObject.setVariableValue(coordinates.get("taskName"));
             taskNameVariableObject.setResult(coordinates.get("taskName"));
             this.variables.put("%%TASK%%", taskNameVariableObject);
+        }
+        if(this.coordinates.get("nodeIp") != null && this.coordinates.get("nodeIp").length() > 0) {
+            DTOVariableConvertResult nodeIpVariableObject = new DTOVariableConvertResult();
+            nodeIpVariableObject.setAction("process");
+            nodeIpVariableObject.setStatus("success");
+            nodeIpVariableObject.setVariableName("%%NODE_IP%%");
+            nodeIpVariableObject.setVariableValue(this.coordinates.get("nodeIp"));
+            nodeIpVariableObject.setResult(this.coordinates.get("nodeIp"));
+            this.variables.put("%%NODE_IP%%", nodeIpVariableObject);
         }
 
         String timeout = this.settings.get("sshTimeout");
@@ -286,11 +297,31 @@ public class GeneralSsh extends AbstractProtocol {
                 if (i >= sequenceCount) {
                     this.sshPromptChar = currentExpect;
                     currentResponse = null;
-                } else {
-                    currentResponse = splitAuthSequence[i].trim();
+                }
+                else {
+
+                    /*
+                     * Injecting variables to auth response
+                     */
+                    DTOVariableInjectResult varInjectResponse = this.injectVariable(splitAuthSequence[i].trim());
+                    if(varInjectResponse.getStatus() == 0) {
+                        if (varInjectResponse.isCtrlSeqInjected()) {
+                            currentResponse = varInjectResponse.getResult();
+                        }
+                        else {
+                            currentResponse = varInjectResponse.getResult() + ENTER_CHARACTER;
+                        }
+                    }
+                    else {
+                        String telnetAuthSequenceMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
+                                ": auth response variable inject error.";
+                        this.logMessage("ERROR", "NODE PARSE CREDENTIALS", telnetAuthSequenceMessage);
+                        return false;
+                    }
+
                     // if template variable
                     if (currentResponse.contains("{{") && currentResponse.contains("}}")) {
-                        switch (currentResponse) {
+                        switch (currentResponse.trim()) {
                             case "{{telnet_login}}":
                                 currentResponse = "{{SKIP}}";
                                 break;
@@ -298,7 +329,7 @@ public class GeneralSsh extends AbstractProtocol {
                                 currentResponse = "{{SKIP}}";
                                 break;
                             case "{{enable_password}}":
-                                currentResponse = this.sshEnablePassword;
+                                currentResponse = this.sshEnablePassword + ENTER_CHARACTER;
                                 break;
                             default:
                                 String sshAuthSequenceMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
@@ -492,7 +523,7 @@ public class GeneralSsh extends AbstractProtocol {
                 }
 
                 if(pair.getSend() != null) {
-                    this.expect.send(pair.getSend() + ENTER_CHARACTER);
+                    this.expect.send(pair.getSend());
                 }
 
                 return true;
@@ -527,7 +558,7 @@ public class GeneralSsh extends AbstractProtocol {
         /*
          * Send enter
          */
-        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.sshPromptChar, "", "", this.sshTimeout, null, false);
+        DTOSendExpectPair pairForPrompt = new DTOSendExpectPair(this.sshPromptChar, ENTER_CHARACTER, "", this.sshTimeout, null, false);
         if (!this.executeCommand(pairForPrompt, false)) {
             return false;
         }
@@ -586,7 +617,7 @@ public class GeneralSsh extends AbstractProtocol {
             /*
              * Sending command
              */
-            this.currentCommand = pair.getSend() + ENTER_CHARACTER;
+            this.currentCommand = pair.getSend();
 
             this.expect.send(this.currentCommand);
 
@@ -647,46 +678,21 @@ public class GeneralSsh extends AbstractProtocol {
             /*
              * Injecting variables to commands
              */
-            if(currentPair.getSend().contains("%%")) {
-
-                for(Map.Entry<String, DTOVariableConvertResult> entry : this.variables.entrySet()) {
-                    if( currentPair.getSend().contains(entry.getKey())) {
-                        // Variable found
-                        // If variable is converted, sending command with injected variable
-                        if(entry.getValue().getAction().equals("process")) {
-                            // check if empty
-                            if(entry.getValue() != null && entry.getValue().getResult() != null && entry.getValue().getResult().length() > 0) {
-                                String tempCommand = currentPair.getSend().replaceAll(entry.getKey(), entry.getValue().getResult());
-                                currentPair.setSend(tempCommand);
-                            }
-                            else {
-                                String sshSetVarFailedMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                        ": empty variable value returned. Command: " + currentPair.getSend() + ". SSH request: set custom variable failed. Check your command.";
-                                this.logMessage("ERROR", "NODE REQUEST", sshSetVarFailedMessage);
-                                return false;
-                            }
-                        }
-                        else {
-                            switch (entry.getValue().getStatus()) {
-                                // If variable converted with error, sending exception log
-                                case "exception":
-                                    String variableConvertErrorMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                            ": variable convertion error. Variable: " + entry.getValue().getVariableName() + ". Message: " + entry.getValue().getMessage();
-                                    this.logMessage("ERROR", "NODE REQUEST", variableConvertErrorMessage);
-                                    return false;
-                                // If variable converted successfully, but action is restrict, skip command and use empty string as command result
-                                case "success":
-                                    skipCommand = true;
-                                    break;
-                                default:
-                                    String variableConvertUnknownStatus = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                            ": unknown status of variable convertion. Variable: " + entry.getValue().getVariableName() + ". Status: " + entry.getValue().getStatus();
-                                    this.logMessage("ERROR", "NODE REQUEST", variableConvertUnknownStatus);
-                                    return false;
-                            }
-                        }
+            DTOVariableInjectResult varInjectResult = this.injectVariable(currentPair.getSend());
+            switch(varInjectResult.getStatus()) {
+                case 0:
+                    if (varInjectResult.isCtrlSeqInjected()) {
+                        currentPair.setSend(varInjectResult.getResult());
                     }
-                }
+                    else {
+                        currentPair.setSend(varInjectResult.getResult()  + ENTER_CHARACTER);
+                    }
+                    break;
+                case 1:
+                    skipCommand = true;
+                    break;
+                case 2:
+                    return false;
             }
 
             if(!skipCommand) {
@@ -774,7 +780,7 @@ public class GeneralSsh extends AbstractProtocol {
      * @return boolean
      */
     protected boolean checkResult(int intRetVal) {
-        return intRetVal == COMMAND_EXECUTION_SUCCESS_OPCODE;
+        return intRetVal == COMMAND_EXECUTION_TIMEOUT_OPCODE;
     }
 
 

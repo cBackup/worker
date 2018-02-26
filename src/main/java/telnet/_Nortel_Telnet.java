@@ -60,7 +60,8 @@ public class _Nortel_Telnet extends GeneralTelnet  {
         /*
          * Set ENTER_CHARACTER
          */
-        ENTER_CHARACTER = "\r";
+        this.ENTER_CHARACTER = "\r";
+        this.controlSeqences.put("%%SEQ(ENTER)%%", this.ENTER_CHARACTER);
     }
 
 
@@ -135,20 +136,6 @@ public class _Nortel_Telnet extends GeneralTelnet  {
         for(Map.Entry<String, Map<String, String>> entry : this.jobs.entrySet()) {
 
             Map<String, String> jobInfo = entry.getValue();
-
-            /*
-             * Searching for control sequence in command(ctrl+c, ctrl+z..etc)
-             */
-            String currentCommand = jobInfo.get("command_value") + ENTER_CHARACTER;
-            if(jobInfo.get("command_value").contains("%%SEQ(")) {
-                for(Map.Entry<String, String> seqVariable : this.controlSeq.entrySet()) {
-                    if(jobInfo.get("command_value").contains(seqVariable.getKey())) {
-                        this.logMessage("WARNING", "CONTAINS", seqVariable.getKey() + seqVariable.getValue());
-                        currentCommand = seqVariable.getValue();
-                        break;
-                    }
-                }
-            }
 
             String currentTableField  = jobInfo.get("table_field");
             String currentTimeout     = jobInfo.get("timeout");

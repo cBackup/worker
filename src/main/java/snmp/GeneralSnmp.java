@@ -29,6 +29,7 @@ import java.util.Vector;
  */
 import java.io.IOException;
 
+import abstractions.DTOVariableInjectResult;
 import org.snmp4j.CommunityTarget;
 import org.snmp4j.PDU;
 import org.snmp4j.Snmp;
@@ -109,6 +110,7 @@ public class GeneralSnmp extends AbstractProtocol {
 
     /**
      * {@inheritDoc}
+     * @noinspection Duplicates
      */
     @Override
     protected Boolean extractSettings()
@@ -133,6 +135,15 @@ public class GeneralSnmp extends AbstractProtocol {
             taskNameVariableObject.setResult(coordinates.get("taskName"));
             taskNameVariableObject.setVariableValue(coordinates.get("taskName"));
             this.variables.put("%%TASK%%", taskNameVariableObject);
+        }
+        if(this.coordinates.get("nodeIp") != null && this.coordinates.get("nodeIp").length() > 0) {
+            DTOVariableConvertResult nodeIpVariableObject = new DTOVariableConvertResult();
+            nodeIpVariableObject.setAction("process");
+            nodeIpVariableObject.setStatus("success");
+            nodeIpVariableObject.setVariableName("%%NODE_IP%%");
+            nodeIpVariableObject.setVariableValue(this.coordinates.get("nodeIp"));
+            nodeIpVariableObject.setResult(this.coordinates.get("nodeIp"));
+            this.variables.put("%%NODE_IP%%", nodeIpVariableObject);
         }
 
         String retries = this.settings.get("snmpRetries");
@@ -354,46 +365,16 @@ public class GeneralSnmp extends AbstractProtocol {
             /*
              * Injecting variables to commands
              */
-            if(command.contains("%%")) {
-
-                // Searching variable in command
-                for(Map.Entry<String, DTOVariableConvertResult> varEntry : this.variables.entrySet()) {
-                    if( command.contains(varEntry.getKey())) {
-                        // Variable found
-                        // If variable is converted, sending command with injected variable
-                        if(varEntry.getValue().getAction().equals("process")) {
-                            // check if empty
-                            if(entry.getValue() != null && varEntry.getValue().getResult() != null && varEntry.getValue().getResult().length() > 0) {
-                                command = command.replaceAll(varEntry.getKey(), varEntry.getValue().getResult());
-                            }
-                            else {
-                                String snmpSetVarFailedMessage = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                        ": empty variable value returned. Command: " + command + ". Variable:" + varEntry.getValue().getVariableName() + ".  SNMP request: set custom variable failed. Check your command.";
-                                this.logMessage("ERROR", "NODE REQUEST", snmpSetVarFailedMessage);
-                                return false;
-                            }
-                        }
-                        else {
-                            switch (varEntry.getValue().getStatus()) {
-                                // If variable converted with error, sending exception log
-                                case "exception":
-                                    String variableConvertMessageError = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                            ": variable convertion error. Variable: " + varEntry.getValue().getVariableName() + ". Message: " + varEntry.getValue().getMessage();
-                                    this.logMessage("ERROR", "NODE REQUEST", variableConvertMessageError);
-                                    return false;
-                                // If variable converted successfully, but action is restrict, skip command and use variable convert result as command result
-                                case "success":
-                                    skipCommand = true;
-                                    break;
-                                default:
-                                    String variableConvertStatusUnknown = "Task " + this.coordinates.get("taskName") + ", node " + this.coordinates.get("nodeId") +
-                                            ": unknown status of variable convertion. Variable: " + varEntry.getValue().getVariableName() + ". Status: " + varEntry.getValue().getStatus();
-                                    this.logMessage("ERROR", "NODE REQUEST", variableConvertStatusUnknown);
-                                    return false;
-                            }
-                        }
-                    }
-                }
+            DTOVariableInjectResult varInjectResult = this.injectVariable(command);
+            switch(varInjectResult.getStatus()) {
+                case 0:
+                    command = varInjectResult.getResult();
+                    break;
+                case 1:
+                    skipCommand = true;
+                    break;
+                case 2:
+                    return false;
             }
 
             /*
