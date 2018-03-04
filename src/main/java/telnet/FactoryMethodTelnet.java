@@ -66,8 +66,8 @@ public class FactoryMethodTelnet {
         GeneralTelnet toReturn = null;
         String className       = null;
 
-        String vendor = coordinates.get("nodeVendor");
-        String model  = coordinates.get("nodeModel");
+        String vendor = coordinates.get("nodeVendor").replaceAll("-", "__");
+        String model  = coordinates.get("nodeModel").replaceAll("-", "__");
 
         if(models.get(vendor) == null) {
             if(models.containsKey(vendor)) {
