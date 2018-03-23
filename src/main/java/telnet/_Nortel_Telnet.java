@@ -137,6 +137,7 @@ public class _Nortel_Telnet extends GeneralTelnet  {
 
             Map<String, String> jobInfo = entry.getValue();
 
+            String currentCommand     = jobInfo.get("command_value");
             String currentTableField  = jobInfo.get("table_field");
             String currentTimeout     = jobInfo.get("timeout");
             String currentVariable    = jobInfo.get("command_var");
